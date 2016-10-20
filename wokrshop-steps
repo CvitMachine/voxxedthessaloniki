@@ -1,0 +1,149 @@
+Jenkins Pipeline Groovy Scripts:
+
+1. Just build and test the Spring Boot web service without Docker.
+Groovy script in Jenkins Pipeline:
+node {
+   stage 'Checkout'
+   git url: 'https://github.com/CvitMachine/voxxedthessaloniki.git'
+   
+   stage 'Build'
+   sh './mvnw clean compile'
+   //sh './mvnw build'
+   //sh './gradlew clean assemble'
+   
+   stage 'Unit Test'
+   sh './mvnw test'
+   // sh './gradlew check'
+}
+
+
+2. Code Review with Pull Requests in Git
+There is another pipeline which makes checks in Jenkins, if everyone gives a go, the code is merged in the trunk.
+There is a screenshot of the whiteboard showing this.
+
+
+3. Build a Docker image, push to registry, then deploy it to Staging.
+Groovy script in Jenkins Pipeline:
+registry = '192.168.1.2'
+staging = '192.168.1.3'
+production = '192.168.1.4'
+
+image = '$registry:5000/demovoxxedthessaloniki:${env.BUILD_NUMBER}'
+container = 'demovoxxedthessaloniki'
+
+node {
+   stage 'Checkout'
+   git url: 'https://github.com/CvitMachine/voxxedthessaloniki.git'
+   
+   stage 'Build'
+   sh './mvnw clean package -Dmaven.test.skip=true'
+   //sh './mvnw build'
+   //sh './gradlew clean assemble'
+   
+   stage 'Unit Test'
+   sh './mvnw test'
+   // sh './gradlew check'
+   
+   stage 'Docker Build'
+   sh "docker build -t $image ."
+   
+   stage 'Docker Push'
+   sh "docker push $image"
+   
+   stage 'Deploy to Staging'
+   sh "docker -H $staging:2375 run -p 8080:8080 -d --name $container $image"
+   
+}
+
+
+3. Build a Docker image, push to registry, then deploy it to Staging, do a smoke test.
+Groovy script in Jenkins Pipeline:
+registry = '192.168.1.2'
+staging = '192.168.1.3'
+production = '192.168.1.4'
+
+image = "$registry:5000/demovoxxedthessaloniki:${env.BUILD_NUMBER}"
+container = 'demovoxxedthessaloniki'
+
+node {
+   stage 'Checkout'
+   git url: 'https://github.com/CvitMachine/voxxedthessaloniki.git'
+   
+   stage 'Build'
+   sh './mvnw clean package -Dmaven.test.skip=true'
+   //sh './mvnw build'
+   //sh './gradlew clean assemble'
+   
+   stage 'Unit Test'
+   sh './mvnw test'
+   // sh './gradlew check'
+   
+   stage 'Docker Build'
+   sh "docker build -t $image ."
+   
+   stage 'Docker Push'
+   sh "docker push $image"
+   
+   stage 'Deploy to Staging'
+   sh "docker -H $staging:2375 stop $container | true"
+   sh "docker -H $staging:2375 rm $container | true"
+   sh "docker -H $staging:2375 run -p 8080:8080 -d --name $container $image"
+   
+   sleep 60
+   
+   stage 'Acceptance Test'
+   sh "test \'hello\' = `curl $staging:8080/hello`"
+   
+}
+
+
+
+4. Build a Docker image, push to registry, then deploy it to Staging, do a smoke test, push to Production, do a smoke test.
+Groovy script in Jenkins Pipeline:
+registry = '192.168.1.2'
+staging = '192.168.1.3'
+production = '192.168.1.4'
+
+image = "$registry:5000/demovoxxedthessaloniki:${env.BUILD_NUMBER}"
+container = 'demovoxxedthessaloniki'
+
+node {
+   stage 'Checkout'
+   git url: 'https://github.com/CvitMachine/voxxedthessaloniki.git'
+   
+   stage 'Build'
+   sh './mvnw clean package -Dmaven.test.skip=true'
+   //sh './mvnw build'
+   //sh './gradlew clean assemble'
+   
+   stage 'Unit Test'
+   sh './mvnw test'
+   // sh './gradlew check'
+   
+   stage 'Docker Build'
+   sh "docker build -t $image ."
+   
+   stage 'Docker Push'
+   sh "docker push $image"
+   
+   stage 'Deploy to Staging'
+   sh "docker -H $staging:2375 stop $container | true"
+   sh "docker -H $staging:2375 rm $container | true"
+   sh "docker -H $staging:2375 run -p 8080:8080 -d --name $container $image"
+   
+   sleep 60
+   
+   stage 'Smoke Test Staging - Acceptance Test'
+   sh "test \'hello\' = `curl $staging:8080/hello`"
+   
+   stage 'Release to Production'
+   sh "docker -H $production:2375 stop $container | true"
+   sh "docker -H $production:2375 rm $container | true"
+   sh "docker -H $production:2375 run -p 8080:8080 -d --name $container $image"
+   
+   sleep 60
+   
+   stage 'Smoke Test Production'
+   sh "test \'hello\' = `curl $production:8080/hello`"
+   
+}
