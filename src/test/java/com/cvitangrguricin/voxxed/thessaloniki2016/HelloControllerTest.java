@@ -14,7 +14,7 @@ public class HelloControllerTest {
         String result = controller.hello();
 
         // then
-        assertEquals("hello", result);
+        assertEquals("hello1", result);
     }
 
 }
